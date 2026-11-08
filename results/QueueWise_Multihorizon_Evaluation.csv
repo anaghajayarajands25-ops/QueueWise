@@ -1,0 +1,7 @@
+Target,Horizon,MAE,RMSE,WAPE (%),High coverage (%),Coverage when actual > 0 (%),Zero-to-positive cases
+Total WL,1,26.549,111.597,9.466,95.9,89.07,155
+Waiting_6plus_Weeks,1,12.182,62.933,18.428,95.27,83.73,494
+Total WL,2,39.276,168.304,14.003,96.03,89.42,201
+Waiting_6plus_Weeks,2,20.229,108.964,30.601,95.52,84.6,544
+Total WL,3,49.73,213.002,17.73,96.38,90.35,198
+Waiting_6plus_Weeks,3,27.197,147.102,41.141,95.1,83.15,559

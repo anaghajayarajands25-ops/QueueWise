@@ -1,0 +1,5 @@
+Model,Dataset,Target,MAE,RMSE,WAPE (%)
+Naive Persistence,Validation,Total WL,27.639,112.989,9.792
+Naive Persistence,Validation,Waiting_6plus_Weeks,14.552,78.618,22.378
+Naive Persistence,Test,Total WL,26.549,111.597,9.466
+Naive Persistence,Test,Waiting_6plus_Weeks,12.182,62.933,18.428

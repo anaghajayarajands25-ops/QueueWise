@@ -1,0 +1,7 @@
+Target,Model,MAE,RMSE,WAPE (%)
+Total WL,Naive Persistence,27.639,112.989,9.792
+Total WL,Linear Regression,28.975,110.431,10.265
+Total WL,XGBoost,30.196,138.602,10.698
+Waiting_6plus_Weeks,Naive Persistence,14.552,78.618,22.378
+Waiting_6plus_Weeks,Linear Regression,15.226,73.085,23.415
+Waiting_6plus_Weeks,XGBoost,14.831,82.81,22.807
