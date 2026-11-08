@@ -1,4 +1,3 @@
-%%writefile /content/drive/MyDrive/QueueWise_Member3/app.py
 import os, sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get('QW_OUT', APP_DIR)
