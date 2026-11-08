@@ -1,3 +1,4 @@
+%%writefile /content/drive/MyDrive/QueueWise_Member3/app.py
 import os, sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 OUT = os.environ.get('QW_OUT', APP_DIR)
@@ -11,50 +12,57 @@ import plotly.express as px
 import plotly.graph_objects as go
 import queuewise_opt as qo
 
-# ------------------------------------------------------------------ page + theme
+# ------------------------------------------------------------------ page + palette
 st.set_page_config(page_title='QueueWise | Diagnostic Capacity Planning',
                    page_icon='🩺', layout='wide', initial_sidebar_state='expanded')
 
-NAVY, TEAL, AMBER, RED, GREY = '#0B2545', '#13808B', '#E9A23B', '#C8553D', '#8D99AE'
-STRAT_COLORS = {'No intervention': GREY, 'Equal': AMBER,
-                'Current backlog': '#4F6D9A', 'QueueWise (forecast-informed)': TEAL}
+PANEL, BORDER, TXT, MUTED, GRID = '#131D2B', '#233248', '#E6EDF5', '#8FA3BA', '#223049'
+OBS, EXP, HIGH, RED, GREY = '#5B8DEF', '#2EC4B6', '#F4B860', '#F06A5A', '#7F8CA3'
+STRAT_COLORS = {'No intervention': GREY, 'Equal': HIGH,
+                'Current backlog': OBS, 'QueueWise (forecast-informed)': EXP}
 
 st.markdown(f"""
 <style>
 .block-container {{padding-top: 1.2rem; padding-bottom: 2rem; max-width: 1400px;}}
 #MainMenu, footer {{visibility: hidden;}}
-.qw-hero {{background: linear-gradient(120deg, {NAVY} 0%, #134074 60%, {TEAL} 100%);
-          padding: 26px 32px; border-radius: 14px; color: #fff; margin-bottom: 18px;}}
+.qw-hero {{background: linear-gradient(120deg, #0B2545 0%, #134074 55%, #13808B 100%);
+          padding: 26px 32px; border-radius: 14px; color: #fff; margin-bottom: 18px;
+          border: 1px solid {BORDER};}}
 .qw-hero h1 {{margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: .3px; color:#fff;}}
-.qw-hero p {{margin: 6px 0 0 0; opacity: .88; font-size: .98rem;}}
-.qw-badge {{display:inline-block; background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.35);
-           padding: 3px 12px; border-radius: 20px; font-size: .78rem; margin: 10px 8px 0 0;}}
-.qw-card {{background:#fff; border:1px solid #E3E8EF; border-left: 5px solid {TEAL};
-          border-radius: 10px; padding: 14px 18px; min-height: 140px; box-shadow: 0 1px 3px rgba(11,37,69,.06);}}
-.qw-card .lbl {{font-size:.74rem; text-transform:uppercase; letter-spacing:.8px; color:#5B6B7F; font-weight:600;}}
-.qw-card .val {{font-size:1.75rem; font-weight:700; color:{NAVY}; line-height:1.25;}}
-.qw-card .sub {{font-size:.78rem; color:#5B6B7F;}}
-.qw-note {{background:#F4F8FB; border:1px solid #D6E2EE; border-radius:10px; padding:12px 16px;
-          font-size:.88rem; color:#27384D; margin: 8px 0 14px 0;}}
-.qw-warn {{background:#FFF7E8; border:1px solid #F1D9A8; border-radius:10px; padding:12px 16px;
-          font-size:.88rem; color:#6B4E10; margin: 8px 0 14px 0;}}
-h3 {{font-weight:650;}}
-
+.qw-hero p {{margin: 6px 0 0 0; opacity: .9; font-size: .98rem; color:#fff;}}
+.qw-badge {{display:inline-block; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.35);
+           padding: 3px 12px; border-radius: 20px; font-size: .78rem; margin: 10px 8px 0 0; color:#fff;}}
+.qw-card {{background:{PANEL}; border:1px solid {BORDER}; border-left: 5px solid {EXP};
+          border-radius: 10px; padding: 14px 18px; min-height: 140px;
+          box-shadow: 0 2px 8px rgba(0,0,0,.25);}}
+.qw-card .lbl {{font-size:.74rem; text-transform:uppercase; letter-spacing:.8px; color:{MUTED}; font-weight:600;}}
+.qw-card .val {{font-size:1.75rem; font-weight:700; color:#F2F6FA; line-height:1.25;}}
+.qw-card .sub {{font-size:.78rem; color:{MUTED};}}
+.qw-note {{background:#12263A; border:1px solid #24415E; border-radius:10px; padding:12px 16px;
+          font-size:.88rem; color:#CFE0F2; margin: 8px 0 14px 0;}}
+.qw-warn {{background:#2B2314; border:1px solid #5A4720; border-radius:10px; padding:12px 16px;
+          font-size:.88rem; color:#F1D9A8; margin: 8px 0 14px 0;}}
 </style>
 """, unsafe_allow_html=True)
 
 
-def card(col, label, value, sub='', color=TEAL):
+def card(col, label, value, sub='', color=EXP):
     col.markdown(f"""<div class="qw-card" style="border-left-color:{color}">
         <div class="lbl">{label}</div><div class="val">{value}</div>
         <div class="sub">{sub}</div></div>""", unsafe_allow_html=True)
 
 
 def show_plot(fig):
-    fig.update_layout(font=dict(family='Inter, Segoe UI, sans-serif', size=13, color='#27384D'),
-                      margin=dict(l=10, r=10, t=60, b=70), plot_bgcolor='#fff', paper_bgcolor='#fff',
-                      legend=dict(orientation='h', yanchor='top', y=-0.12, xanchor='left', x=0))
-    fig.update_xaxes(gridcolor='#EEF2F6'); fig.update_yaxes(gridcolor='#EEF2F6')
+    has_legend = len(fig.data) > 1 and fig.layout.showlegend is not False
+    fig.update_layout(
+        font=dict(family='Inter, Segoe UI, sans-serif', size=13, color=TXT),
+        paper_bgcolor=PANEL, plot_bgcolor=PANEL,
+        margin=dict(l=20, r=30, t=70, b=95 if has_legend else 65),
+        title_x=0.02, title_xanchor='left', title_font_size=16,
+        legend=dict(orientation='h', yanchor='top', y=-0.14, xanchor='left', x=0,
+                    bgcolor='rgba(0,0,0,0)', font=dict(color=TXT)))
+    fig.update_xaxes(gridcolor=GRID, zerolinecolor=GRID, automargin=True, color=TXT)
+    fig.update_yaxes(gridcolor=GRID, zerolinecolor=GRID, automargin=True, color=TXT)
     try:
         st.plotly_chart(fig, width='stretch', theme=None)
     except TypeError:
@@ -83,10 +91,12 @@ def get_data(path):
 
 
 if not os.path.exists(FC_PATH):
-    st.error(f'Forecast file not found at `{FC_PATH}`. Upload it to Drive first (Cell 1).')
+    st.error(f'Forecast file not found at `{FC_PATH}`. Make sure `data/QueueWise_Forecast_Scenarios.csv` '
+             'sits next to app.py.')
     st.stop()
 fc = get_data(FC_PATH)
-origin = pd.to_datetime(fc['forecast_origin']).max().strftime('%B %Y')
+origin_dt = pd.to_datetime(fc['forecast_origin']).max()
+origin = origin_dt.strftime('%B %Y')
 
 # ------------------------------------------------------------------ hero
 st.markdown(f"""
@@ -134,9 +144,9 @@ fmonth = d['forecast_month'].iloc[0].strftime('%B %Y')
 k1, k2, k3, k4 = st.columns(4)
 obs, exp, hi = (d['Waiting_6plus_Weeks'].sum(), d['forecast_waiting_6plus_expected'].sum(),
                 d['forecast_waiting_6plus_high'].sum())
-card(k1, f'Observed 6+ wk ({origin})', f'{obs:,.0f}', f'{len(d):,} provider-test units', NAVY)
-card(k2, f'Expected 6+ wk ({fmonth})', f'{exp:,.0f}', 'Persistence forecast', TEAL)
-card(k3, 'High-pressure 6+ wk', f'{hi:,.0f}', f'+{(hi - exp) / max(exp, 1) * 100:.1f}% stress allowance', AMBER)
+card(k1, f'Observed 6+ wk ({origin})', f'{obs:,.0f}', f'{len(d):,} provider-test units', OBS)
+card(k2, f'Expected 6+ wk ({fmonth})', f'{exp:,.0f}', 'Persistence forecast', EXP)
+card(k3, 'High-pressure 6+ wk', f'{hi:,.0f}', f'+{(hi - exp) / max(exp, 1) * 100:.1f}% stress allowance', HIGH)
 qw = tbl.loc['QueueWise (forecast-informed)']
 card(k4, 'QueueWise reduction', f"{qw['Reduction %']:.1f}%",
      f"{qw['Reduction in 6+ wk waits']:,.0f} simulated waits cleared · {budget:,.0f} slots", RED)
@@ -151,11 +161,11 @@ with tabs[0]:
     by = (d.groupby('Test')[['Waiting_6plus_Weeks', 'forecast_waiting_6plus_expected',
                              'forecast_waiting_6plus_high']].sum().sort_values('forecast_waiting_6plus_high'))
     fig = go.Figure()
-    fig.add_bar(y=by.index, x=by['Waiting_6plus_Weeks'], name=f'Observed ({origin})', orientation='h', marker_color=NAVY)
-    fig.add_bar(y=by.index, x=by['forecast_waiting_6plus_expected'], name='Expected', orientation='h', marker_color=TEAL)
-    fig.add_bar(y=by.index, x=by['forecast_waiting_6plus_high'], name='High pressure', orientation='h', marker_color=AMBER)
-    fig.update_layout(title=f'Patients waiting 6+ weeks by test ({fmonth})', barmode='group',
-                      height=560, xaxis_title='Patients')
+    fig.add_bar(y=by.index, x=by['Waiting_6plus_Weeks'], name=f'Observed ({origin})', orientation='h', marker_color=OBS)
+    fig.add_bar(y=by.index, x=by['forecast_waiting_6plus_expected'], name='Expected', orientation='h', marker_color=EXP)
+    fig.add_bar(y=by.index, x=by['forecast_waiting_6plus_high'], name='High pressure', orientation='h', marker_color=HIGH)
+    fig.update_layout(title=f'Patients waiting 6+ weeks by test, {fmonth}', barmode='group', height=600)
+    fig.update_xaxes(tickformat='~s')
     with c1:
         show_plot(fig)
 
@@ -164,16 +174,16 @@ with tabs[0]:
         t = t[t['Provider'].isin(sel_provs)]
     tr = t.groupby('forecast_month')[['forecast_total_wl_expected', 'forecast_total_wl_high']].sum().reset_index()
     base_total = t[t.horizon_months == 1]['Total WL'].sum()
+    xs = [origin_dt] + tr['forecast_month'].tolist()
     fig2 = go.Figure()
-    fig2.add_scatter(x=[pd.to_datetime(fc['forecast_origin']).max()] + tr['forecast_month'].tolist(),
-                     y=[base_total] + tr['forecast_total_wl_expected'].tolist(),
-                     name='Expected', mode='lines+markers', line=dict(color=TEAL, width=3))
-    fig2.add_scatter(x=[pd.to_datetime(fc['forecast_origin']).max()] + tr['forecast_month'].tolist(),
-                     y=[base_total] + tr['forecast_total_wl_high'].tolist(),
-                     name='High pressure', mode='lines+markers', line=dict(color=AMBER, width=3, dash='dash'),
-                     fill='tonexty', fillcolor='rgba(233,162,59,.15)')
-    fig2.update_layout(title='Total waiting list: expected vs high-pressure scenario', height=560,
-                       yaxis_title='Patients waiting', yaxis_rangemode='tozero')
+    fig2.add_scatter(x=xs, y=[base_total] + tr['forecast_total_wl_expected'].tolist(),
+                     name='Expected', mode='lines+markers', line=dict(color=EXP, width=3))
+    fig2.add_scatter(x=xs, y=[base_total] + tr['forecast_total_wl_high'].tolist(),
+                     name='High pressure', mode='lines+markers', line=dict(color=HIGH, width=3, dash='dash'),
+                     fill='tonexty', fillcolor='rgba(244,184,96,.16)')
+    fig2.update_layout(title='Total waiting list outlook (patients)', height=600)
+    fig2.update_yaxes(tickformat='~s', rangemode='tozero')
+    fig2.update_xaxes(tickformat='%b %Y', dtick='M1')
     with c2:
         show_plot(fig2)
     st.markdown('<div class="qw-note"><b>Reading this:</b> the forecast is a <i>stock of patients already '
@@ -186,13 +196,14 @@ with tabs[1]:
     st.markdown(f'#### Four strategies, {fmonth}, **{"expected" if scen == "expected" else "high-pressure"}** scenario')
     plot_df = tbl.reset_index()
     c1, c2, c3 = st.columns(3)
-    for col, metric, title in [(c1, 'Reduction in 6+ wk waits', 'Simulated reduction in 6+ week waits'),
+    for col, metric, title in [(c1, 'Reduction in 6+ wk waits', 'Simulated reduction in 6+ wk waits'),
                                (c2, 'Fairness (Jain index, 0-1)', 'Fairness (Jain index)'),
                                (c3, 'Utilization % (useful slots)', 'Slot utilisation (%)')]:
         f = px.bar(plot_df, x='Strategy', y=metric, color='Strategy', color_discrete_map=STRAT_COLORS,
                    title=title, text_auto=',.3g')
-        f.update_layout(showlegend=False, height=380, xaxis_title=None, yaxis_title=None)
-        f.update_xaxes(tickangle=-25)
+        f.update_layout(showlegend=False, height=400, xaxis_title=None, yaxis_title=None)
+        f.update_xaxes(tickangle=-30)
+        f.update_traces(textfont_color=TXT, textposition='outside', cliponaxis=False)
         with col:
             show_plot(f)
     show_table(tbl.style.format('{:,.2f}', subset=['Reduction %', 'Utilization % (useful slots)',
@@ -223,14 +234,15 @@ with tabs[2]:
     with c1:
         bt = out.groupby('Diagnostic test')['QueueWise slots'].sum().sort_values()
         f = px.bar(x=bt.values, y=bt.index, orientation='h', title='QueueWise slots by test',
-                   color_discrete_sequence=[TEAL])
-        f.update_layout(height=470, xaxis_title='Extra slots', yaxis_title=None)
+                   color_discrete_sequence=[EXP])
+        f.update_layout(height=500, xaxis_title='Extra slots', yaxis_title=None)
         show_plot(f)
     with c2:
         top = out.head(15).iloc[::-1]
-        f = px.bar(top, x='QueueWise slots', y=top['Provider'] + ' · ' + top['Diagnostic test'],
-                   orientation='h', title='Top 15 recommended units', color_discrete_sequence=[NAVY])
-        f.update_layout(height=470, xaxis_title='Extra slots', yaxis_title=None)
+        labels = (top['Provider'].str.slice(0, 32) + ' · ' + top['Diagnostic test'])
+        f = px.bar(top, x='QueueWise slots', y=labels, orientation='h', title='Top 15 recommended units',
+                   color_discrete_sequence=[OBS])
+        f.update_layout(height=500, xaxis_title='Extra slots', yaxis_title=None)
         show_plot(f)
     st.markdown(f'**{len(out):,} units** receive slots (of {len(d):,}). Top 10 units take '
                 f'**{out["Share of QueueWise budget %"].head(10).sum():.1f}%** of the budget.')
@@ -249,8 +261,8 @@ with tabs[3]:
         st.info('This provider has no waiting list in the selected tests.')
     else:
         a, b, c = st.columns(3)
-        card(a, 'Total waiting list (Aug)', f"{dp['Total WL'].sum():,.0f}", p, NAVY)
-        card(b, 'Expected 6+ wk', f"{dp['forecast_waiting_6plus_expected'].sum():,.0f}", fmonth, TEAL)
+        card(a, 'Total waiting list (Aug)', f"{dp['Total WL'].sum():,.0f}", p, OBS)
+        card(b, 'Expected 6+ wk', f"{dp['forecast_waiting_6plus_expected'].sum():,.0f}", fmonth, EXP)
         card(c, 'QueueWise extra slots', f"{dp['QueueWise slots'].sum():,.0f}", 'recommended', RED)
         st.write('')
         m = dp.melt(id_vars='Test', value_vars=['Waiting_6plus_Weeks', 'forecast_waiting_6plus_expected',
@@ -259,9 +271,9 @@ with tabs[3]:
         m['Measure'] = m['Measure'].map({'Waiting_6plus_Weeks': 'Observed', 'forecast_waiting_6plus_expected': 'Expected',
                                          'forecast_waiting_6plus_high': 'High pressure'})
         f = px.bar(m, x='Test', y='Patients', color='Measure', barmode='group',
-                   color_discrete_map={'Observed': NAVY, 'Expected': TEAL, 'High pressure': AMBER},
+                   color_discrete_map={'Observed': OBS, 'Expected': EXP, 'High pressure': HIGH},
                    title='Patients waiting 6+ weeks by test')
-        f.update_layout(height=420, xaxis_title=None)
+        f.update_layout(height=440, xaxis_title=None)
         show_plot(f)
         show_table(dp[['Test', 'Total WL', 'Waiting_6plus_Weeks', 'forecast_waiting_6plus_expected',
                        'forecast_waiting_6plus_high', 'QueueWise slots']]
@@ -287,13 +299,13 @@ with tabs[4]:
 
     sg = sens_grid(d, scen, cap_pct, lam)
     c1, c2, c3 = st.columns(3)
-    for col, key, title, scale in [(c1, 'red', 'QueueWise reduction in 6+ wk waits (%)', 'Teal'),
+    for col, key, title, scale in [(c1, 'red', 'QueueWise reduction (%)', 'Teal'),
                                    (c2, 'fair', 'QueueWise fairness (Jain)', 'Blues'),
-                                   (c3, 'fair_gap', 'Fairness advantage over backlog', 'RdYlGn')]:
+                                   (c3, 'fair_gap', 'Fairness edge over backlog', 'RdYlGn')]:
         pv = sg.pivot(index='eff', columns='budget', values=key)
         f = px.imshow(pv, text_auto='.2f', aspect='auto', color_continuous_scale=scale,
                       labels=dict(x='Budget (% of 6+ wk waits)', y='Clearance per slot'), title=title)
-        f.update_layout(height=380, coloraxis_showscale=False)
+        f.update_layout(height=400, coloraxis_showscale=False)
         with col:
             show_plot(f)
 
@@ -305,9 +317,9 @@ with tabs[4]:
         lrows.append(dict(lam=l_, Reduction=q['Reduction %'], Fairness=q['Fairness (Jain index, 0-1)']))
     ld = pd.DataFrame(lrows)
     f = go.Figure()
-    f.add_scatter(x=ld['lam'], y=ld['Fairness'], name='Fairness (Jain)', line=dict(color=TEAL, width=3), mode='lines+markers')
+    f.add_scatter(x=ld['lam'], y=ld['Fairness'], name='Fairness (Jain)', line=dict(color=EXP, width=3), mode='lines+markers')
     f.add_scatter(x=ld['lam'], y=ld['Reduction'] / 100, name='Reduction (fraction)', line=dict(color=RED, width=3), mode='lines+markers')
-    f.update_layout(height=340, xaxis_title='λ (risk weight)', yaxis_title='Value')
+    f.update_layout(height=380, xaxis_title='λ (risk weight)', yaxis_title='Value')
     show_plot(f)
 
 # ------------------------------------------------------------------ tab 6: method
