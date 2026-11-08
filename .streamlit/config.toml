@@ -1,3 +1,18 @@
-[theme]
-base = "light"
-primaryColor = "#13808B"
+import os
+from google.colab import drive
+drive.mount('/content/drive')
+
+OUT = '/content/drive/MyDrive/QueueWise_Member3'
+os.makedirs(f'{OUT}/.streamlit', exist_ok=True)
+open(f'{OUT}/.streamlit/config.toml', 'w').write('''[theme]
+base = "dark"
+primaryColor = "#2EC4B6"
+backgroundColor = "#0E1621"
+secondaryBackgroundColor = "#131D2B"
+textColor = "#E6EDF5"
+''')
+
+!pkill -f streamlit || true
+!nohup streamlit run /content/drive/MyDrive/QueueWise_Member3/app.py --server.port 8501 --server.headless true --theme.base dark --theme.primaryColor "#2EC4B6" --theme.backgroundColor "#0E1621" --theme.secondaryBackgroundColor "#131D2B" --theme.textColor "#E6EDF5" --server.enableCORS false --server.enableXsrfProtection false &>/content/logs.txt &
+!sleep 6
+!tail -3 /content/logs.txt
