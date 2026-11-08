@@ -1,2 +1,2 @@
 # QueueWise
-An Uncertainty-Aware Forecasting and Capacity-Optimization Framework
+Forecast-informed diagnostic capacity allocation dashboard (NHS England DM01 data). Results are simulated, not measured patient outcomes.
