@@ -1,305 +1,355 @@
-# 🩺 QueueWise
-### Uncertainty-Aware Forecasting and Capacity Optimisation for NHS England Diagnostic Waiting Lists
+# QueueWise
+
+### An Uncertainty-Aware Forecasting and Capacity-Optimization Framework for Reducing Diagnostic Waiting-List Pressure
 
 <p align="center">
-  <strong>Forecasting meets intelligent healthcare resource allocation.</strong>
+  <strong>Forecasting meets data-driven healthcare capacity planning.</strong>
 </p>
 
-**Live Dashboard:** [QueueWise – Streamlit App](https://queuewise-tw82cbi2gjruseps85et9h.streamlit.app/)
+<p align="center">
+  <a href="https://queuewise-tw82cbi2gjruseps85et9h.streamlit.app/"><strong>Live QueueWise Dashboard</strong></a>
+</p>
 
 ---
 
-## 📌 Project Overview
+## Project Overview
 
-QueueWise is a healthcare analytics and decision-support project designed to address diagnostic waiting-list pressures across NHS England.
+QueueWise is a healthcare analytics and decision-support prototype developed to examine diagnostic waiting-list pressure across NHS England.
 
-The project combines historical diagnostic waiting-list data, predictive forecasting, uncertainty estimation and optimisation techniques to recommend how additional diagnostic appointment capacity can be distributed across healthcare providers and diagnostic services.
+The project combines historical diagnostic waiting-list data, provider-level forecasting, empirical uncertainty scenarios and a capacity-allocation simulation. It is designed to help explore where additional diagnostic appointment capacity might be prioritised under different planning assumptions.
 
-Rather than allocating additional appointments equally or relying entirely on existing backlogs, QueueWise introduces a forecast-informed allocation strategy that considers both expected waiting-list requirements and potential high-pressure scenarios.
+QueueWise compares conventional allocation strategies with a forecast-informed, risk-weighted approach and presents the results through an interactive Streamlit dashboard.
 
-The final output is an interactive Streamlit dashboard that allows users to explore forecasts, compare allocation strategies, analyse provider-level requirements and evaluate the sensitivity of allocation decisions to different assumptions.
+**Important:** The forecasts estimate the stock of patients waiting at the end of a reporting period. They do not predict new referrals or patient arrivals.
 
-## 🎯 Project Objectives
+## Project Objectives
 
-- Analyse historical NHS England diagnostic waiting-list data.
-- Forecast future diagnostic waiting-list volumes across multiple time horizons.
-- Quantify uncertainty through high-pressure forecasting scenarios.
-- Develop an optimisation-based approach for allocating additional diagnostic capacity.
-- Compare forecast-informed allocation against conventional allocation strategies.
-- Evaluate allocation efficiency, fairness and potential reduction in long-wait patients.
-- Provide an interactive decision-support dashboard for healthcare resource planning.
+- Prepare and quality-check monthly NHS England diagnostic waiting-times data.
+- Forecast total waiting-list size and the number of patients waiting six weeks or longer.
+- Compare simple and machine-learning forecasting approaches.
+- Represent potential underprediction through an empirical high-pressure scenario.
+- Simulate the allocation of additional appointment capacity across provider–service units.
+- Compare allocation strategies using reduction, utilisation and fairness measures.
+- Present forecasts and simulation results in an interactive dashboard.
 
-## 🏗️ Project Architecture
+## Project Workflow
 
-The QueueWise workflow consists of four major stages:
+1. **Data preparation:** Combine, clean and reconcile NHS England DM01 monthly diagnostic waiting-times and activity data.
+2. **Forecasting:** Compare Naive Persistence, Linear Regression and XGBoost regression using chronological validation.
+3. **Uncertainty analysis:** Estimate empirical underprediction-error uplifts to create a high-pressure stress scenario.
+4. **Capacity allocation:** Use a risk-weighted water-filling allocation method subject to budget and provider–service capacity constraints.
+5. **Dashboard:** Explore forecasts, compare allocation strategies and inspect provider-level recommendations and assumptions.
 
-1. **Data Processing:** Cleaning, preparing and reconciling historical NHS DM01 diagnostic waiting-list data.
-2. **Forecasting:** Evaluating Naive Persistence, Linear Regression and XGBoost models to estimate future waiting-list volumes.
-3. **Uncertainty Estimation:** Incorporating empirical 90th-percentile forecast-error uplifts to construct high-pressure scenarios.
-4. **Capacity Optimisation:** Applying a risk-weighted allocation algorithm to distribute additional appointment capacity across provider-service units.
+## Dataset and Preparation
 
-The resulting forecasts and allocation outputs are presented through an interactive Streamlit dashboard.
+**Source:** NHS England — Diagnostic Waiting Times and Activity (DM01) monthly extracts.
 
-## 📊 Dataset
+**Historical reporting period:** September 2024 to August 2026 (24 monthly reporting periods).
 
-**Data source:** NHS England – Diagnostic Waiting Times and Activity (DM01).
+The combined provider-level dataset contained:
 
-The project uses cleaned and processed monthly diagnostic waiting-list data covering:
+- **173,600 rows** and **24 columns**.
+- **484 providers**.
+- **16 diagnostic categories**, including the `TOTAL` category.
+- **48 missing provider-name values**, with no missing numerical values or duplicate provider–service–month keys.
 
-- September 2024 – August 2026
-- Healthcare provider organisations
-- Diagnostic service categories
-- Total waiting-list volumes
-- Patients waiting six weeks or longer
-- Diagnostic activity information
+The `TOTAL` category was excluded from model-ready data to avoid double-counting the individual diagnostic services. This left **162,750 provider–service–month records across 15 individual diagnostic categories**.
 
-The forecasting dataset contains **20,610 provider-service-horizon records**.
+The forecasting targets are:
 
-Each allocation unit represents a combination of a healthcare provider and a diagnostic service.
-
-## 🤖 Forecasting Methodology
-
-Three forecasting approaches were evaluated:
-
-| Model | Description |
+| Target | Meaning |
 |---|---|
-| Naive Persistence | Uses the latest observed value as the future forecast |
-| Linear Regression | Captures linear patterns in historical waiting-list data |
-| XGBoost | Models nonlinear relationships using gradient-boosted decision trees |
+| `Total WL` | Total number of patients on the waiting list at the end of the month |
+| `Waiting_6plus_Weeks` | Number of patients waiting six weeks or longer |
 
-Model performance was evaluated using:
+The six-weeks-or-longer count was derived from the relevant waiting-time categories. An internal reconciliation compared each provider-month `TOTAL` record with the sum of its individual diagnostic services: **10,850 provider-month groups were checked across 24 months, with zero mismatches**. This is an internal consistency check; it is not an independent validation against published NHS national summary totals.
 
-- Mean Absolute Error (MAE)
-- Root Mean Squared Error (RMSE)
-- Weighted Absolute Percentage Error (WAPE)
+### Feature Engineering
 
-### Forecast evaluation
+The forecasting workflow used:
 
-The Naive Persistence model achieved the following test-set results:
+- Calendar-aligned 1-, 2- and 3-month lags for waiting-list and activity measures.
+- Three-month rolling means.
+- Month-to-month growth features.
+- Cyclic month-of-year features.
+- One-hot encoding for provider and diagnostic-service categories.
+- A shared preprocessing pipeline, fitted on the training data only.
 
-| Forecast target | 1-month WAPE | 2-month WAPE | 3-month WAPE |
+Rows without a complete three-month lag history were excluded rather than treating missing history as zero. This produced **140,280 eligible modelling rows**, covering December 2024 to August 2026 (21 eligible target months).
+
+## Forecasting Methodology
+
+Three approaches were evaluated:
+
+| Approach | Description |
+|---|---|
+| Naive Persistence | Uses the preceding month's observed count as the forecast |
+| Linear Regression | Models linear relationships between engineered features and the target |
+| XGBoost Regression | Uses gradient-boosted decision trees to model relationships in the data |
+
+### Chronological Data Split
+
+The data were split by time rather than randomly, so later observations were not used to train models evaluated on earlier periods.
+
+| Split | Period | Rows |
+|---|---|---:|
+| Training | Dec 2024 – Feb 2026 | 99,855 |
+| Validation | Mar 2026 – May 2026 | 20,280 |
+| Held-out test | Jun 2026 – Aug 2026 | 20,145 |
+
+Models were selected using **validation WAPE**. The held-out test set was reserved for final evaluation.
+
+### Evaluation Metrics
+
+- **MAE (Mean Absolute Error):** Average absolute difference between actual and predicted counts.
+- **RMSE (Root Mean Squared Error):** Gives greater weight to larger errors.
+- **WAPE (Weighted Absolute Percentage Error):** Total absolute error divided by total actual volume, expressed as a percentage.
+
+WAPE was used as the model-selection metric to compare error relative to the overall waiting-list volume across provider–service records. It is an aggregate metric; it does not mean that every provider has that percentage error.
+
+### Validation Results and Model Selection
+
+| Forecast target | Naive Persistence | Linear Regression | XGBoost |
 |---|---:|---:|---:|
-| Total waiting list | 9.47% | 14.00% | 17.73% |
-| Waiting 6+ weeks | 18.43% | 30.60% | 41.10% |
+| Total WL — WAPE | **9.792%** | 10.265% | 10.698% |
+| Waiting 6+ weeks — WAPE | **22.378%** | 23.415% | 22.807% |
 
-The forecast horizons represent one, two and three months ahead of the August 2026 forecast origin.
+**Naive Persistence was selected for both targets** because it achieved the lowest validation WAPE. Linear Regression had a slightly lower validation RMSE, but WAPE was the selection criterion.
 
-### Uncertainty Estimation
+### Held-Out Multi-Horizon Performance
 
-To account for potential underprediction, QueueWise incorporates an empirical 90th-percentile forecast-error uplift.
+The final forecast origin is **August 2026**, with forecasts for September, October and November 2026.
 
-Two scenarios are generated:
+| Forecast horizon | Total WL WAPE | Waiting 6+ weeks WAPE |
+|---|---:|---:|
+| 1 month ahead | 9.466% | 18.428% |
+| 2 months ahead | 14.003% | 30.601% |
+| 3 months ahead | 17.730% | 41.141% |
 
-- **Expected scenario:** The baseline forecast using persistence.
-- **High-pressure scenario:** The expected forecast adjusted using empirically estimated underprediction allowances.
+Errors increase with the forecast horizon, particularly for the six-weeks-or-longer target. Although Linear Regression had a slightly lower held-out test WAPE for Total WL, the selected model was not changed after examining the test set; doing so would introduce test-set selection bias.
 
-The high-pressure scenario represents a stress-testing assumption rather than a guaranteed statistical prediction interval.
+### Forecast Scenarios
 
-## ⚖️ Capacity Allocation and Optimisation
+Two scenarios are generated for each provider, diagnostic service and forecast month:
 
-QueueWise implements a risk-weighted allocation algorithm using a water-filling approach.
+- **Expected scenario:** Naive Persistence carries the August 2026 observed count forward. As a result, the expected value for each provider–service unit remains constant across the three forecast horizons.
+- **High-pressure scenario:** Adds a nonnegative uplift based on the 90th percentile of historical underprediction errors estimated from the March–May 2026 validation period.
 
-The allocation considers:
+The high-pressure uplifts were stratified by diagnostic category, target, forecast horizon and historical size band when a group had at least 30 observations. A service-level fallback was used for smaller groups. Uplifts were constrained not to decrease with the forecast horizon, and high estimates for six-week waits were capped at the corresponding high Total WL estimate.
 
-- Forecast waiting-list requirements.
-- High-pressure waiting-list estimates.
-- Available additional appointment capacity.
-- A configurable budget.
-- Maximum capacity constraints for each provider-service unit.
-- A risk-weighting parameter (λ).
+**These high-pressure values are empirical stress-test scenarios. They are not formally calibrated or guaranteed 90% prediction intervals.**
+
+The scenario file contains **20,610 records**: 6,870 August 2026 provider–service combinations, each represented at three forecast horizons.
+
+#### Aggregate Forecast Outputs
+
+| Forecast month | Expected Total WL | High Total WL | Expected Waiting 6+ weeks | High Waiting 6+ weeks |
+|---|---:|---:|---:|---:|
+| September 2026 | 1,833,070 | 2,117,666 | 452,306 | 616,656 |
+| October 2026 | 1,833,070 | 2,305,778 | 452,306 | 725,639 |
+| November 2026 | 1,833,070 | 2,490,398 | 452,306 | 776,849 |
+
+These outputs are forecasts relative to the August 2026 data cutoff, not live forecasts refreshed with later NHS data.
+
+### Forecast Visualisations
+
+![Actual versus predicted waiting-list values](figures/QueueWise_Actual_vs_Predicted.png)
+
+![Expected and high-pressure forecast scenarios](figures/QueueWise_Forecast_Scenarios.png)
+
+## Capacity Allocation and Optimisation
+
+The allocation component is implemented in `queuewise_opt.py`. It uses a water-filling method to distribute a configurable appointment-slot budget proportionally to allocation weights while respecting provider–service capacity caps.
 
 The risk-weighted forecast need is:
 
-\[
-S_i = E_i + \lambda(H_i-E_i)
-\]
+**Scoreᵢ = Expectedᵢ + λ × (Highᵢ − Expectedᵢ)**
 
 Where:
 
-- \(S_i\) = Risk-weighted allocation score.
-- \(E_i\) = Expected waiting-list forecast.
-- \(H_i\) = High-pressure forecast.
-- \(\lambda\) = Risk-weighting parameter between 0 and 1.
+- `Expectedᵢ` is the expected six-week waiting-list forecast for a provider–service unit.
+- `Highᵢ` is its high-pressure six-week waiting-list estimate.
+- `λ` is the risk-weighting parameter, ranging from 0 to 1.
 
-The algorithm distributes additional appointment slots proportionally to these scores while respecting capacity constraints.
+The dashboard compares four strategies:
 
-### Allocation strategies compared
-
-| Strategy | Allocation approach |
+| Strategy | Allocation basis |
 |---|---|
-| No intervention | No additional appointment capacity |
-| Equal allocation | Equal distribution across eligible units |
-| Current backlog | Allocation based on observed long-wait backlogs |
-| **QueueWise** | Forecast-informed, risk-weighted allocation |
+| No intervention | No additional appointment slots |
+| Equal allocation | Distributes slots equally across eligible units |
+| Current backlog | Uses the observed six-week waiting-list count |
+| **QueueWise (forecast-informed)** | Uses expected and high-pressure forecasts with a configurable risk weight |
 
-### Evaluation metrics
-
-The allocation strategies are evaluated using:
+The simulation reports measures such as:
 
 - Reduction in patients waiting six weeks or longer.
-- Percentage reduction in long-wait patients.
-- Appointment-slot utilisation.
-- Jain's Fairness Index.
+- Percentage reduction in six-week waits.
+- Remaining six-week waiting-list count.
+- Appointment-slot utilisation and unused slots.
 - Percentage of units receiving capacity.
-- Remaining long-wait patients.
-- Unused appointment slots.
+- Jain's Fairness Index.
 
-All reduction figures are simulated estimates, not observed clinical outcomes.
+The number of patients assumed to be cleared per additional slot is configurable. This is a simulation assumption, not a measured clinical effect.
 
-## 🖥️ Interactive Dashboard
+## Interactive Dashboard
 
-**Explore the live application:** [Launch QueueWise](https://queuewise-tw82cbi2gjruseps85et9h.streamlit.app/)
+**[Launch the QueueWise Streamlit Dashboard](https://queuewise-tw82cbi2gjruseps85et9h.streamlit.app/)**
 
-The dashboard includes six interactive sections:
+The dashboard provides six sections:
 
-1. **Forecast:** Visualises observed, expected and high-pressure waiting-list volumes across diagnostic services.
-2. **Strategy Comparison:** Compares the four allocation strategies using efficiency, reduction and fairness metrics.
-3. **Recommended Allocation:** Displays the recommended distribution of additional appointment slots across provider-service units.
-4. **Provider View:** Allows provider-level exploration of waiting-list forecasts and recommended capacity.
-5. **Sensitivity Analysis:** Examines how allocation outcomes change with different budgets, clearance efficiencies and risk-weighting assumptions.
-6. **Method & Assumptions:** Documents the forecasting pipeline, optimisation methodology and project limitations.
+1. **Forecast:** Explore observed, expected and high-pressure waiting-list counts.
+2. **Strategy comparison:** Compare no intervention, equal allocation, current-backlog allocation and QueueWise.
+3. **Recommended allocation:** Inspect the proposed additional appointment slots by provider and diagnostic service.
+4. **Provider view:** Examine provider-level waiting-list forecasts and allocations.
+5. **Sensitivity:** Explore how budgets, capacity limits, clearance assumptions and risk weighting affect simulated outcomes.
+6. **Method & assumptions:** Review the forecasting, optimisation and scenario assumptions.
 
-Users can interactively modify forecast horizons, diagnostic services, healthcare providers, scenarios and optimisation parameters.
+Users can filter by forecast horizon, diagnostic service and provider, and switch between expected and high-pressure scenarios.
 
-## 🛠️ Technology Stack
+## Technology Stack
 
-| Category | Technologies |
+| Area | Tools |
 |---|---|
-| Programming Language | Python |
-| Data Processing | Pandas, NumPy |
-| Machine Learning | Scikit-learn, XGBoost |
-| Optimisation | Custom Python optimisation module, Water-filling algorithm |
+| Programming | Python |
+| Data handling | Pandas, NumPy |
+| Forecast model experiments | Scikit-learn, XGBoost |
+| Optimisation | Custom Python module, water-filling allocation |
 | Visualisation | Plotly |
-| Dashboard Development | Streamlit |
-| Data Source | NHS England DM01 |
-| Development Environment | Google Colab |
-| Version Control | Git, GitHub |
+| Dashboard | Streamlit |
+| Notebooks | Jupyter Notebook / Google Colab |
+| Version control | Git and GitHub |
 | Deployment | Streamlit Community Cloud |
 
-## 📂 Repository Structure
+The current `requirements.txt` lists the dependencies needed to run the Streamlit dashboard. The forecasting notebooks may require additional modelling packages, including Scikit-learn and XGBoost.
 
-```text
+## Repository Structure
+
+~~~text
 QueueWise/
 │
 ├── app.py
-│   └── Streamlit dashboard application
+│   └── Streamlit dashboard
 │
 ├── queuewise_opt.py
-│   └── Capacity allocation and optimisation module
+│   └── Allocation, water-filling and evaluation functions
 │
 ├── requirements.txt
-│   └── Python dependencies
+│   └── Dashboard dependencies
 │
 ├── README.md
-│   └── Project documentation
-│
-├── .gitignore
+│   └── Project overview and documentation
 │
 ├── .streamlit/
 │   └── config.toml
-│       └── Dashboard theme configuration
+│       └── Streamlit theme configuration
 │
-└── data/
-    └── QueueWise_Forecast_Scenarios.csv
-        └── Forecast scenarios used by the application
-```
+├── data/
+│   ├── QueueWise_Cleaned_Provider_Data (1).csv
+│   │   └── Cleaned provider-level historical data
+│   └── QueueWise_Forecast_Scenarios.csv
+│       └── Expected and high-pressure forecast scenarios used by the dashboard
+│
+├── notebooks/
+│   ├── HA_Capstone_Preprocessing.ipynb
+│   └── QueueWise_Forecasting.ipynb
+│
+├── docs/
+│   ├── Member2_Methodology_Results_Limitations.md
+│   └── Member3_Handover.md
+│
+├── figures/
+│   ├── QueueWise_Actual_vs_Predicted.png
+│   └── QueueWise_Forecast_Scenarios.png
+│
+└── results/
+    ├── QueueWise_24Month_Reconciliation.csv
+    ├── QueueWise_Baseline_Results.csv
+    ├── QueueWise_Multihorizon_Evaluation.csv
+    ├── QueueWise_Test_Model_Comparison.csv
+    ├── QueueWise_Uncertainty_Calibration.csv
+    └── QueueWise_Validation_Model_Comparison.csv
+~~~
 
-## 🚀 Running the Project Locally
+## Running the Dashboard Locally
 
-### 1. Clone the repository
+### 1. Clone the Repository
 
-```bash
-git clone https://github.com/YOUR-USERNAME/queuewise.git
-cd queuewise
-```
+~~~bash
+git clone https://github.com/anaghajayarajands25-ops/QueueWise.git
+cd QueueWise
+~~~
 
-### 2. Create a virtual environment
+### 2. Create and Activate a Virtual Environment
 
-```bash
-python -m venv venv
-```
+~~~bash
+python -m venv .venv
+~~~
 
-Activate it:
+**Windows PowerShell:**
 
-**Windows:**
-```bash
-venv\Scripts\activate
-```
+~~~powershell
+.\.venv\Scripts\Activate.ps1
+~~~
 
-**Mac/Linux:**
-```bash
-source venv/bin/activate
-```
+**macOS / Linux:**
 
-### 3. Install dependencies
+~~~bash
+source .venv/bin/activate
+~~~
 
-```bash
+### 3. Install Dashboard Dependencies
+
+~~~bash
 pip install -r requirements.txt
-```
+~~~
 
-### 4. Launch the dashboard
+### 4. Run the Application
 
-```bash
+~~~bash
 streamlit run app.py
-```
+~~~
 
-The application will be accessible at:
+The dashboard will be available at:
 
-```text
+~~~text
 http://localhost:8501
-```
+~~~
 
-## ☁️ Deployment
+Make sure `data/QueueWise_Forecast_Scenarios.csv` is present in the repository. The dashboard loads this file when it starts.
 
-QueueWise is deployed using Streamlit Community Cloud.
+## Limitations and Future Work
 
-The deployment process involves:
+### Limitations
 
-1. Hosting the application source code on GitHub.
-2. Connecting the GitHub repository to Streamlit Community Cloud.
-3. Configuring `app.py` as the application entry point.
-4. Installing dependencies through `requirements.txt`.
-5. Deploying the interactive dashboard.
+- The historical dataset covers 24 months, with 21 eligible target months after lag generation and only three months in each validation and test period.
+- Naive Persistence assumes recent observed counts continue; it does not explicitly model new referrals, completed appointments, changes in capacity or policy, or sudden pressure changes.
+- Forecast errors increase at longer horizons, especially for six-week waits.
+- The data contain many zero-count provider–service records, making emerging waiting lists difficult to anticipate.
+- The high-pressure scenario is an empirical stress test, not a formally calibrated prediction interval.
+- Internal reconciliation was completed, but independent agreement with published NHS national summary totals has not been established.
+- Simulated allocation improvements depend on assumptions such as the number of long waits cleared per additional slot. They are not measured patient outcomes.
+- The forecasts are decision-support inputs and should not be treated as operational recommendations without further validation.
 
-**Live Application:** [https://queuewise-tw82cbi2gjruseps85et9h.streamlit.app/](https://queuewise-tw82cbi2gjruseps85et9h.streamlit.app/)
+### Future Improvements
 
-## ⚠️ Limitations and Future Improvements
+- Extend the historical data period and evaluate with additional rolling-origin backtests.
+- Investigate more advanced time-series and machine-learning forecasting approaches.
+- Develop formally calibrated probabilistic forecasts.
+- Incorporate changes in referrals, activity, provider capacity and policy where suitable data are available.
+- Validate allocation assumptions and recommendations against real operational outcomes.
+- Explore additional fairness and service-specific constraints.
 
-Although QueueWise provides a structured approach to diagnostic capacity planning, certain limitations should be considered:
-
-- The expected forecast uses a persistence-based approach.
-- Forecast uncertainty increases with longer prediction horizons.
-- The high-pressure scenario is based on empirical forecast-error uplifts and is not a calibrated prediction interval.
-- Appointment clearance efficiency is a configurable simulation assumption.
-- Simulated waiting-list reductions do not establish actual improvements in patient outcomes.
-- The allocation strategy requires real-world validation before operational implementation.
-- The current forecast origin is August 2026; the dashboard does not provide live NHS forecasts.
-
-### Future Enhancements
-
-- Incorporate more advanced time-series and machine-learning forecasting models.
-- Develop a historical rolling-origin backtesting framework.
-- Introduce calibrated probabilistic forecasting.
-- Integrate real-time NHS diagnostic waiting-list data.
-- Incorporate provider-specific operational capacity and resource constraints.
-- Validate allocation recommendations using real-world outcomes.
-- Explore fairness-aware optimisation across healthcare providers.
-
-## 👩‍💻 Project Contributors
-
-**Developed by:**
+## Project Contributors
 
 - **Anagha Jayarajan**
 - **Sravana Nambiar**
 - **Nakshathra V**
 
-This project was collaboratively developed as an application of data science, forecasting, optimisation and healthcare analytics.
+This project was collaboratively developed as an academic healthcare analytics capstone combining data preparation, forecasting, uncertainty analysis, optimisation and dashboard development.
 
-## 📌 Project Disclaimer
+## Disclaimer
 
-QueueWise is an academic and research-oriented decision-support prototype. Its forecasts and allocation recommendations are intended for analytical exploration and simulation.
-
-The estimated reductions in waiting lists are model-based simulations, not verified clinical outcomes or operational recommendations. The application should not be used for actual NHS capacity decisions without further validation.
+QueueWise is an academic and research-oriented decision-support prototype. Forecasts are based on historical NHS England DM01 data, and allocation outcomes are generated through simulation. They are not verified clinical outcomes, guaranteed prediction intervals or operational NHS recommendations.
 
 ---
 
